@@ -1,28 +1,45 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { CandidateMetadata } from "#/types";
+import type { CandidateRecord, PersonMetadata } from "#/types";
 
-export async function saveCandidateMetadata(outputDir: string, meta: CandidateMetadata) {
-  await fs.mkdir(outputDir, { recursive: true });
-  const metaPath = path.join(outputDir, `meta_${meta.seed}.json`);
-  await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
+function metadataPath(outputDir: string, personId: string) {
+  return path.join(outputDir, personId, "metadata.json");
 }
 
-export async function loadPersonMetadata(personDir: string): Promise<CandidateMetadata[]> {
-  const files = await fs.readdir(personDir).catch(() => []);
-  const metaFiles = files.filter((f) => f.startsWith("meta_") && f.endsWith(".json"));
+export async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  const metaList = await Promise.all(
-    metaFiles.map(async (f) => {
-      try {
-        const raw = await fs.readFile(path.join(personDir, f), "utf-8");
-        return JSON.parse(raw) as CandidateMetadata;
-      } catch {
-        return null;
-      }
-    }),
-  );
+export async function loadPersonMetadata(outputDir: string, personId: string): Promise<PersonMetadata> {
+  try {
+    const raw = await fs.readFile(metadataPath(outputDir, personId), "utf-8");
+    return JSON.parse(raw) as PersonMetadata;
+  } catch {
+    return { personId, candidates: [] };
+  }
+}
 
-  return metaList.filter((m): m is CandidateMetadata => m !== null);
+export async function savePersonMetadata(outputDir: string, metadata: PersonMetadata): Promise<void> {
+  const personDir = path.join(outputDir, metadata.personId);
+  await fs.mkdir(personDir, { recursive: true });
+  await fs.writeFile(metadataPath(outputDir, metadata.personId), JSON.stringify(metadata, null, 2));
+}
+
+export async function upsertCandidate(outputDir: string, personId: string, candidate: CandidateRecord): Promise<void> {
+  const metadata = await loadPersonMetadata(outputDir, personId);
+  const idx = metadata.candidates.findIndex((c) => c.seed === candidate.seed);
+
+  if (idx >= 0) {
+    metadata.candidates[idx] = { ...metadata.candidates[idx], ...candidate };
+  } else {
+    metadata.candidates.push(candidate);
+  }
+
+  await savePersonMetadata(outputDir, metadata);
 }

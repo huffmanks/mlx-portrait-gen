@@ -1,14 +1,13 @@
 import fs from "fs/promises";
 import path from "path";
 
-import { saveCandidateMetadata } from "#/generation/metadata";
+import { upsertCandidate } from "#/generation/metadata";
 import { evaluationPrompt } from "#/prompt/evaluation";
-import type { CandidateBatchMap, EvaluationBatchMap, MfluxModel, QualityReport } from "#/types";
+import type { CandidateBatchMap, CandidateRecord, MfluxModel, QualityReport } from "#/types";
 
 async function evaluateQuality(imagePath: string, expectedPrompt: string): Promise<QualityReport> {
   const imageBuffer = await fs.readFile(imagePath);
   const base64Image = imageBuffer.toString("base64");
-
   const prompt = evaluationPrompt(expectedPrompt);
 
   try {
@@ -21,7 +20,6 @@ async function evaluateQuality(imagePath: string, expectedPrompt: string): Promi
         stream: false,
         format: "json",
         think: false,
-        options: { temperature: 0.2 },
       }),
     });
 
@@ -51,8 +49,12 @@ async function evaluateQuality(imagePath: string, expectedPrompt: string): Promi
       .replace(/```\s*/gi, "")
       .trim();
 
-    const result = JSON.parse(cleanedResponse) as QualityReport;
-    return result;
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON object found in Ollama response.");
+    }
+
+    return JSON.parse(jsonMatch[0]) as QualityReport;
   } catch (error) {
     console.warn("AI Evaluation fallback to 70 due to connection error:", error);
     return {
@@ -69,13 +71,12 @@ export async function evaluateAllCandidates(
   candidatesMap: CandidateBatchMap,
   selectedModel: MfluxModel = "flux2-klein-4b",
 ) {
-  const evaluationResults: EvaluationBatchMap = {};
+  const evaluationResults: CandidateBatchMap = {};
+  const outputDir = path.resolve("./output");
 
   for (const personId of Object.keys(candidatesMap)) {
     const candidates = candidatesMap[personId];
     evaluationResults[personId] = [];
-
-    const outputDir = path.resolve("./output", personId);
 
     for (const candidate of candidates) {
       console.log(`Evaluating [${personId}] image: ${path.basename(candidate.candidatePath)}...`);
@@ -87,23 +88,20 @@ export async function evaluateAllCandidates(
         console.log(`\tIssues: ${evalReport.issuesFound.join(", ")}`);
       }
 
-      await saveCandidateMetadata(outputDir, {
-        personId: candidate.personId,
-        seed: candidate.seed,
-        model: selectedModel,
-        prompt: candidate.prompt,
-        overallScore: evalReport.overallScore,
-        photorealismScore: evalReport.photorealismScore,
-        anatomicalCorrectness: evalReport.anatomicalCorrectness,
-        promptAdherenceScore: evalReport.promptAdherenceScore,
-        issues: evalReport.issuesFound,
-      });
-
-      evaluationResults[personId].push({
+      const updated: CandidateRecord = {
         ...candidate,
-        overallScore: evalReport.overallScore,
+        model: selectedModel,
+        scores: {
+          overallScore: evalReport.overallScore,
+          photorealismScore: evalReport.photorealismScore,
+          anatomicalCorrectness: evalReport.anatomicalCorrectness,
+          promptAdherenceScore: evalReport.promptAdherenceScore,
+        },
         issues: evalReport.issuesFound,
-      });
+      };
+
+      await upsertCandidate(outputDir, personId, updated);
+      evaluationResults[personId].push(updated);
     }
   }
 

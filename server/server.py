@@ -11,6 +11,7 @@ from mflux.models.common.config import ModelConfig
 from mflux.models.z_image import ZImageTurbo
 from mflux.models.flux2.variants import Flux2Klein
 from mflux.models.flux.variants.txt2img.flux import Flux1
+from mflux.models.seedvr2 import SeedVR2
 
 current_model_name = None
 active_model = None
@@ -58,28 +59,30 @@ def load_or_get_model(model_name: str, quantize: int = 4):
 
     if model_name == "z-image-turbo":
         active_model = ZImageTurbo(
-            quantize=quantize,
-            model_config=ModelConfig.z_image_turbo()
+            model_config=ModelConfig.z_image_turbo(),
+            model_path="mlx-community/Z-Image-Turbo-bf16",
+            quantize=None
         )
     elif model_name in ["flux2", "flux2-klein-4b"]:
         active_model = Flux2Klein(
-            quantize=quantize,
-            model_config=ModelConfig.flux2_klein_4b()
+            model_config=ModelConfig.flux2_klein_4b(),
+            model_path="mlx-community/FLUX.2-klein-4B-bf16",
+            quantize=None
         )
     elif model_name == "flux2-klein-9b":
         active_model = Flux2Klein(
-            quantize=quantize,
-            model_config=ModelConfig.flux2_klein_9b()
+            model_config=ModelConfig.flux2_klein_9b(),
+            quantize=quantize
         )
     elif model_name in ["flux1-schnell", "schnell"]:
         active_model = Flux1.from_name(
-            model_name="schnell",
-            quantize=quantize
+            quantize=quantize,
+            model_name="schnell"
         )
     elif model_name == "dev":
         active_model = Flux1.from_name(
-            model_name="dev",
-            quantize=quantize
+            quantize=quantize,
+            model_name="dev"
         )
     else:
         raise ValueError(f"Unsupported model variant: {model_name}")
@@ -87,6 +90,23 @@ def load_or_get_model(model_name: str, quantize: int = 4):
     current_model_name = model_name
     print(f"[MFLUX Server] '{model_name}' loaded successfully.\n")
     return active_model
+
+
+def load_or_get_upscale_model():
+    global current_model_name, active_model
+    if current_model_name == "seedvr2-upscale" and active_model is not None:
+        return active_model
+
+    cleanup_memory()
+    print("[MFLUX Server] Loading SeedVR2 upscale model...")
+    active_model = SeedVR2(
+        model_config=ModelConfig.seedvr2_3b(),
+        model_path="mlx-community/SeedVR2-3B-mlx-int8"
+    )
+    current_model_name = "seedvr2-upscale"
+    print("[MFLUX Server] SeedVR2 loaded successfully.\n")
+    return active_model
+
 
 class MfluxModel(str, Enum):
     Z_IMAGE_TURBO = "z-image-turbo"
@@ -103,6 +123,13 @@ class GenerateRequest(BaseModel):
     output_path: str
     steps: int | None = None
     quantize: int = 4
+
+class UpscaleRequest(BaseModel):
+    image_path: str
+    output_path: str
+    resolution: int = 2160
+    softness: float = 0.5
+    seed: int = 42
 
 @app.post("/generate")
 def generate(req: GenerateRequest):
@@ -139,6 +166,30 @@ def generate(req: GenerateRequest):
 
         except Exception as e:
             print(f"\n❌ [MFLUX Server Error] Generation failed: {e}")
+            mx.clear_cache()
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/upscale")
+def upscale(req: UpscaleRequest):
+    with generation_lock:
+        try:
+            model = load_or_get_upscale_model()
+
+            image = model.generate_image(
+                seed=req.seed,
+                image_path=req.image_path,
+                resolution=req.resolution,
+                softness=req.softness,
+            )
+
+            os.makedirs(os.path.dirname(req.output_path), exist_ok=True)
+            image.save(req.output_path)
+
+            return {"status": "success", "path": req.output_path}
+
+        except Exception as e:
+            print(f"\n❌ [MFLUX Server Error] Upscale failed: {e}")
             mx.clear_cache()
             raise HTTPException(status_code=500, detail=str(e))
 

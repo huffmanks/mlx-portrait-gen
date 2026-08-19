@@ -1,8 +1,9 @@
 import fs from "fs/promises";
 import path from "path";
 
+import { loadPersonMetadata } from "#/generation/metadata";
 import { evaluateAllCandidates } from "#/quality/evaluate";
-import type { CandidateBatchMap, CandidateMetadata, MfluxModel } from "#/types";
+import type { CandidateBatchMap, MfluxModel } from "#/types";
 
 async function main() {
   const SELECTED_MODEL_NAME: MfluxModel = "flux2-klein-4b";
@@ -17,40 +18,18 @@ async function main() {
     const stat = await fs.stat(personPath).catch(() => null);
     if (!stat?.isDirectory()) continue;
 
-    const files = await fs.readdir(personPath);
-    const pngFiles = files.filter(
-      (f) => f.toLowerCase().endsWith(".png") && (f.startsWith("candidate_") || f.startsWith("portrait_")),
-    );
-
-    if (pngFiles.length === 0) {
-      console.warn(`No PNG candidate images found in ./output/${personId}`);
+    const metadata = await loadPersonMetadata(outputDir, personId);
+    if (metadata.candidates.length === 0) {
+      console.warn(`No candidates found for ${personId}`);
       continue;
     }
 
-    let aggregatedMeta: CandidateMetadata[] = [];
-    try {
-      const metaContent = await fs.readFile(path.join(personPath, "metadata.json"), "utf-8");
-      aggregatedMeta = JSON.parse(metaContent) as CandidateMetadata[];
-    } catch {}
-
-    candidatesMap[personId] = await Promise.all(
-      pngFiles.map(async (file) => {
-        const seedStr = file.replace(/[^0-9]/g, "");
-        const seed = parseInt(seedStr, 10) || 0;
-
-        return {
-          personId,
-          seed,
-          candidatePath: path.join(personPath, file),
-          prompt: "",
-        };
-      }),
-    );
+    candidatesMap[personId] = metadata.candidates;
   }
 
   const folderCount = Object.keys(candidatesMap).length;
   if (folderCount === 0) {
-    console.error("No candidate PNGs found in ./output. Run 'just gen' to generate images first.");
+    console.error("No candidates found in ./output. Run 'just gen' to generate images first.");
     return;
   }
 
@@ -59,10 +38,10 @@ async function main() {
 
   console.log("\nEvaluation Summary:");
   for (const personId of Object.keys(results)) {
-    const evals = results[personId].sort((a, b) => b.overallScore - a.overallScore);
+    const evals = results[personId].sort((a, b) => (b.scores?.overallScore ?? 0) - (a.scores?.overallScore ?? 0));
     const best = evals[0];
     if (best) {
-      console.log(`[${personId}] Top Score: ${best.overallScore}/100 (${path.basename(best.candidatePath)})`);
+      console.log(`[${personId}] Top Score: ${best.scores?.overallScore}/100 (${path.basename(best.candidatePath)})`);
     }
   }
 }

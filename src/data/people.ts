@@ -1,6 +1,6 @@
 import type { PersonRecord } from "#/types";
 
-export const people: PersonRecord[] = [
+export const people: Array<PersonRecord> = [
   {
     id: "p_001",
     birthdate: "05/14/1992",

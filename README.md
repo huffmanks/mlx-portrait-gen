@@ -55,3 +55,47 @@ Sharp Quality Evaluation & Metadata JSON Output
     └── quality
         └── evaluate.ts
 ```
+
+## Get started
+
+### Install Ollama
+
+- [Quickstart](https://docs.ollama.com/quickstart)
+
+### Install mflux and huggingface cli
+
+```sh
+uv tool install --upgrade mflux
+uv tool install huggingface_hub
+```
+
+### Pre-download models
+
+#### For generation
+
+```sh
+hf download mlx-community/Z-Image-Turbo-bf16
+hf download mlx-community/FLUX.2-klein-4B-bf16
+
+```
+
+#### For review
+
+```sh
+ollama pull qwen3-vl:8b
+```
+
+#### For upscale
+
+```sh
+hf download mlx-community/SeedVR2-3B-mlx-int8
+```
+
+### Run
+
+```sh
+just gen
+just review
+just fix
+just upscale
+```
