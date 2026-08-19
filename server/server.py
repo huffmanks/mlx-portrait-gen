@@ -1,5 +1,6 @@
 import gc
 import os
+import threading
 from enum import Enum
 from contextlib import asynccontextmanager
 import mlx.core as mx
@@ -13,6 +14,7 @@ from mflux.models.flux.variants.txt2img.flux import Flux1
 
 current_model_name = None
 active_model = None
+generation_lock = threading.Lock()
 
 def cleanup_memory():
     """Unloads active model and releases Metal GPU cache back to macOS."""
@@ -104,37 +106,45 @@ class GenerateRequest(BaseModel):
 
 @app.post("/generate")
 def generate(req: GenerateRequest):
-    try:
-        model = load_or_get_model(req.model, req.quantize)
+    with generation_lock:
+        try:
+            model = load_or_get_model(req.model, req.quantize)
 
-        steps = req.steps
-        if steps is None:
-            if req.model == "z-image-turbo":
-                steps = 9
-            elif req.model in ["flux2", "flux2-klein-4b", "flux2-klein-9b", "flux1-schnell", "schnell"]:
-                steps = 4
-            elif req.model == "dev":
-                steps = 25
-            else:
-                steps = 4
+            steps = req.steps
+            if steps is None:
+                if req.model == "z-image-turbo":
+                    steps = 9
+                elif req.model in ["flux2", "flux2-klein-4b", "flux2-klein-9b", "flux1-schnell", "schnell"]:
+                    steps = 4
+                elif req.model == "dev":
+                    steps = 25
+                else:
+                    steps = 4
 
-        result = model.generate_image(
-            prompt=req.prompt,
-            seed=req.seed,
-            num_inference_steps=steps
-        )
+            result = model.generate_image(
+                prompt=req.prompt,
+                seed=req.seed,
+                num_inference_steps=steps
+            )
 
-        os.makedirs(os.path.dirname(req.output_path), exist_ok=True)
-        result.save(req.output_path)
+            os.makedirs(os.path.dirname(req.output_path), exist_ok=True)
+            result.save(req.output_path)
 
-        return {
-            "status": "success",
-            "model_used": req.model,
-            "steps": steps,
-            "path": req.output_path
-        }
+            return {
+                "status": "success",
+                "model_used": req.model,
+                "steps": steps,
+                "path": req.output_path
+            }
 
-    except Exception as e:
-        print(f"\n❌ [MFLUX Server Error] Generation failed: {e}")
-        mx.clear_cache()
-        raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            print(f"\n❌ [MFLUX Server Error] Generation failed: {e}")
+            mx.clear_cache()
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/unload")
+def unload():
+    with generation_lock:
+        cleanup_memory()
+    return {"status": "unloaded"}

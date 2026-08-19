@@ -1,5 +1,3 @@
-export type Task<T> = () => Promise<T>;
-
 export type PersonRecord = {
   id: string;
   birthdate: string; // Format: "MM/DD/YYYY"
@@ -12,13 +10,21 @@ export type PersonRecord = {
   weight: number; // pounds
 };
 
-export type CandidateMetadata = {
+export type GeneratedCandidate = {
   personId: string;
   seed: number;
-  model: string;
+  candidatePath: string;
   prompt: string;
-  score?: number;
 };
+
+export type CandidateBatchMap = Record<string, Array<GeneratedCandidate>>;
+
+export interface EvaluatedCandidate extends GeneratedCandidate {
+  overallScore: number;
+  issues: string[];
+}
+
+export type EvaluationBatchMap = Record<string, Array<EvaluatedCandidate>>;
 
 export type GenerationParams = {
   model: MfluxModel;
@@ -27,6 +33,18 @@ export type GenerationParams = {
   outputPath: string;
   steps?: number;
   quantize?: number;
+};
+
+export type CandidateMetadata = {
+  personId: string;
+  seed: number;
+  model: MfluxModel;
+  prompt: string;
+  overallScore: number;
+  photorealismScore: number;
+  anatomicalCorrectness: number;
+  promptAdherenceScore: number;
+  issues?: string[];
 };
 
 export type MfluxModel =
@@ -38,8 +56,9 @@ export type MfluxModel =
   | "dev"; // FLUX.1 Dev (20–28 steps, highest quality, slower)
 
 export type QualityReport = {
-  sharpnessScore: number; // High variance = sharp eyes/skin texture
-  isOverExposed: boolean; // Blown out whites check
-  isUnderExposed: boolean; // Pitch black shadows check
-  overallScore: number; // Normalized score 0-100
+  overallScore: number;
+  photorealismScore: number;
+  anatomicalCorrectness: number;
+  promptAdherenceScore: number;
+  issuesFound: string[];
 };

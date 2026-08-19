@@ -2,13 +2,10 @@
   "name": "mlx-portrait-gen",
   "version": "1.0.0",
   "description": "",
-  "main": "src/main.ts",
+  "main": "src/cmd/gen.ts",
   "type": "module",
   "imports": {
     "#/*": "./src/*.ts"
-  },
-  "scripts": {
-    "start": "node src/main.ts"
   },
   "keywords": [],
   "author": "",

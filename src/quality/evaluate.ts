@@ -1,46 +1,111 @@
-import sharp from "sharp";
+import fs from "fs/promises";
+import path from "path";
 
-import type { QualityReport } from "#/types";
+import { saveCandidateMetadata } from "#/generation/metadata";
+import { evaluationPrompt } from "#/prompt/evaluation";
+import type { CandidateBatchMap, EvaluationBatchMap, MfluxModel, QualityReport } from "#/types";
 
-export async function evaluatePortrait(imagePath: string): Promise<QualityReport> {
-  const image = sharp(imagePath);
-  const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+async function evaluateQuality(imagePath: string, expectedPrompt: string): Promise<QualityReport> {
+  const imageBuffer = await fs.readFile(imagePath);
+  const base64Image = imageBuffer.toString("base64");
 
-  let totalLuminance = 0;
-  let overExposedPixels = 0;
-  let underExposedPixels = 0;
-  const pixelCount = info.width * info.height;
+  const prompt = evaluationPrompt(expectedPrompt);
 
-  // Calculate mean luminance and clipping boundaries
-  for (let i = 0; i < data.length; i += info.channels) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  try {
+    const response = await fetch("http://127.0.0.1:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen3-vl:8b",
+        messages: [{ role: "user", content: prompt, images: [base64Image] }],
+        stream: false,
+        format: "json",
+        think: false,
+        options: { temperature: 0.2 },
+      }),
+    });
 
-    totalLuminance += lum;
-    if (lum > 250) overExposedPixels++;
-    if (lum < 5) underExposedPixels++;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ollama HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = (await response.json()) as {
+      message?: { content?: string; thinking?: string };
+      error?: string;
+    };
+
+    if (data.error) {
+      throw new Error(`Ollama API error: ${data.error}`);
+    }
+
+    const rawContent = data.message?.content?.trim() || data.message?.thinking?.trim();
+
+    if (!rawContent) {
+      console.error("Ollama Raw Payload:", JSON.stringify(data, null, 2));
+      throw new Error("Ollama returned an empty message content.");
+    }
+
+    const cleanedResponse = rawContent
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/gi, "")
+      .trim();
+
+    const result = JSON.parse(cleanedResponse) as QualityReport;
+    return result;
+  } catch (error) {
+    console.warn("AI Evaluation fallback to 70 due to connection error:", error);
+    return {
+      overallScore: 70,
+      photorealismScore: 70,
+      anatomicalCorrectness: 70,
+      promptAdherenceScore: 70,
+      issuesFound: ["Evaluator offline or error occurred"],
+    };
+  }
+}
+
+export async function evaluateAllCandidates(
+  candidatesMap: CandidateBatchMap,
+  selectedModel: MfluxModel = "flux2-klein-4b",
+) {
+  const evaluationResults: EvaluationBatchMap = {};
+
+  for (const personId of Object.keys(candidatesMap)) {
+    const candidates = candidatesMap[personId];
+    evaluationResults[personId] = [];
+
+    const outputDir = path.resolve("./output", personId);
+
+    for (const candidate of candidates) {
+      console.log(`Evaluating [${personId}] image: ${path.basename(candidate.candidatePath)}...`);
+
+      const evalReport = await evaluateQuality(candidate.candidatePath, candidate.prompt);
+
+      console.log(`Score: ${evalReport.overallScore}/100`);
+      if (evalReport.issuesFound.length > 0) {
+        console.log(`\tIssues: ${evalReport.issuesFound.join(", ")}`);
+      }
+
+      await saveCandidateMetadata(outputDir, {
+        personId: candidate.personId,
+        seed: candidate.seed,
+        model: selectedModel,
+        prompt: candidate.prompt,
+        overallScore: evalReport.overallScore,
+        photorealismScore: evalReport.photorealismScore,
+        anatomicalCorrectness: evalReport.anatomicalCorrectness,
+        promptAdherenceScore: evalReport.promptAdherenceScore,
+        issues: evalReport.issuesFound,
+      });
+
+      evaluationResults[personId].push({
+        ...candidate,
+        overallScore: evalReport.overallScore,
+        issues: evalReport.issuesFound,
+      });
+    }
   }
 
-  const meanLuminance = totalLuminance / pixelCount;
-  const overExposedRatio = overExposedPixels / pixelCount;
-  const underExposedRatio = underExposedPixels / pixelCount;
-
-  // Calculate image sharpness using standard deviation of grayscale variance
-  const stats = await image.stats();
-  const avgStdDev = stats.channels.reduce((acc, c) => acc + c.stdev, 0) / stats.channels.length;
-
-  // Compute final candidate score (0-100 scale)
-  let score = 100;
-  if (avgStdDev < 35) score -= 40; // Too blurry / loss of skin pore detail
-  if (overExposedRatio > 0.05) score -= 30; // Blown out studio highlights
-  if (underExposedRatio > 0.1) score -= 20; // Crushed shadows
-
-  return {
-    sharpnessScore: Math.round(avgStdDev),
-    isOverExposed: overExposedRatio > 0.05,
-    isUnderExposed: underExposedRatio > 0.1,
-    overallScore: Math.max(0, score),
-  };
+  return evaluationResults;
 }
