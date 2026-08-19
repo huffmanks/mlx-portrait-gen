@@ -1,10 +1,8 @@
 export type MfluxModel =
-  | "z-image-turbo" // Fast, lightweight, 9 inference steps (0.0 guidance)
-  | "flux2" // Alias for FLUX.2 Klein 4B (4-8 steps, low RAM)
-  | "flux2-klein-4b" // FLUX.2 Klein 4B parameter model
-  | "flux2-klein-9b" // FLUX.2 Klein 9B parameter model (higher fidelity)
+  | "z-image-turbo" // Fast, lightweight, (9 steps, 0.0 guidance)
+  | "flux2-klein-4b" // FLUX.2 Klein 4B (4-8 steps, low RAM)
   | "flux1-schnell" // FLUX.1 Schnell (4 steps)
-  | "dev"; // FLUX.1 Dev (20–28 steps, highest quality, slower)
+  | "flux1-dev"; // FLUX.1 Dev (20–28 steps, highest quality, slower)
 
 export type PersonRecord = {
   id: string;

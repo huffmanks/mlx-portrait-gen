@@ -10,11 +10,10 @@ Build and operate a local, automated AI headshot generation pipeline using struc
 - **Inference Framework:** MFLUX / Apple MLX (4-bit quantization to fit inside 16 GB RAM)
 - **Supported Models:**
   - Generation/fix:
-    - `z-image-turbo`
+    - `z-image-turbo-4b`
     - `flux2-klein-4b`
-    - `flux2-klein-9b`
-    - `flux1-schnell`
-    - `dev`
+    - `flux1-schnell-4b`
+    - `flux1-dev-4b`
   - Review:
     - `qwen3-vl:8b`
   - Upscale:
@@ -91,8 +90,10 @@ uv tool install huggingface_hub
 - #### For generation/fix
 
   ```sh
-  hf download mlx-community/Z-Image-Turbo-bf16
-  hf download mlx-community/FLUX.2-klein-4B-bf16
+  hf download andrevp/Z-Image-Turbo-MLX-4bit
+  hf download mlx-community/flux2-klein-4b-8bit
+  hf download AITRADER/FLUX1-schnell-mlx-4bit
+  hf download AITRADER/FLUX1-dev-mlx-4bit
   ```
 
 - #### For review

@@ -60,29 +60,26 @@ def load_or_get_model(model_name: str, quantize: int = 4):
     if model_name == "z-image-turbo":
         active_model = ZImageTurbo(
             model_config=ModelConfig.z_image_turbo(),
-            model_path="mlx-community/Z-Image-Turbo-bf16",
+            model_path="andrevp/Z-Image-Turbo-MLX-4bit",
             quantize=None
         )
     elif model_name in ["flux2", "flux2-klein-4b"]:
         active_model = Flux2Klein(
             model_config=ModelConfig.flux2_klein_4b(),
-            model_path="mlx-community/FLUX.2-klein-4B-bf16",
+            model_path="mlx-community/flux2-klein-4b-8bit",
             quantize=None
-        )
-    elif model_name == "flux2-klein-9b":
-        active_model = Flux2Klein(
-            model_config=ModelConfig.flux2_klein_9b(),
-            quantize=quantize
         )
     elif model_name in ["flux1-schnell", "schnell"]:
         active_model = Flux1.from_name(
-            quantize=quantize,
-            model_name="schnell"
+            model_name="schnell",
+            model_path="AITRADER/FLUX1-schnell-mlx-4bit",
+            quantize=None
         )
     elif model_name == "dev":
         active_model = Flux1.from_name(
-            quantize=quantize,
-            model_name="dev"
+            model_name="dev",
+            model_path="AITRADER/FLUX1-dev-mlx-4bit",
+            quantize=None
         )
     else:
         raise ValueError(f"Unsupported model variant: {model_name}")
@@ -141,7 +138,7 @@ def generate(req: GenerateRequest):
             if steps is None:
                 if req.model == "z-image-turbo":
                     steps = 9
-                elif req.model in ["flux2", "flux2-klein-4b", "flux2-klein-9b", "flux1-schnell", "schnell"]:
+                elif req.model in ["flux2", "flux2-klein-4b", "flux1-schnell", "schnell"]:
                     steps = 4
                 elif req.model == "dev":
                     steps = 25
