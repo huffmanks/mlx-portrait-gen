@@ -1,8 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
 
+import { evaluateAllCandidates } from "#/generation/evaluate";
 import { loadPersonMetadata } from "#/generation/metadata";
-import { evaluateAllCandidates } from "#/quality/evaluate";
 import type { CandidateBatchMap, MfluxModel } from "#/types";
 
 async function main() {

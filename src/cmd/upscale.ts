@@ -1,8 +1,9 @@
 import path from "path";
 
 import { people } from "#/data/people";
-import { fileExists, loadPersonMetadata, savePersonMetadata } from "#/generation/metadata";
+import { loadPersonMetadata, savePersonMetadata } from "#/generation/metadata";
 import { upscaleWithMflux } from "#/generation/mflux";
+import { fileExists } from "#/lib/utils";
 
 async function main() {
   const outputDir = path.resolve("./output");

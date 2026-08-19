@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 import { upsertCandidate } from "#/generation/metadata";
-import { evaluationPrompt } from "#/prompt/evaluation";
+import { evaluationPrompt } from "#/prompts/evaluation";
 import type { CandidateBatchMap, CandidateRecord, MfluxModel, QualityReport } from "#/types";
 
 async function evaluateQuality(imagePath: string, expectedPrompt: string): Promise<QualityReport> {

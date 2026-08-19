@@ -7,15 +7,6 @@ function metadataPath(outputDir: string, personId: string) {
   return path.join(outputDir, personId, "metadata.json");
 }
 
-export async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function loadPersonMetadata(outputDir: string, personId: string): Promise<PersonMetadata> {
   try {
     const raw = await fs.readFile(metadataPath(outputDir, personId), "utf-8");

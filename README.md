@@ -8,7 +8,17 @@ Build and operate a local, automated AI headshot generation pipeline using struc
 - **Orchestrator:** Node.js / TypeScript
 - **Inference Daemon:** Python + FastAPI holding MFLUX in memory
 - **Inference Framework:** MFLUX / Apple MLX (4-bit quantization to fit inside 16 GB RAM)
-- **Supported Models:** z-image-turbo, flux2-klein-4b, flux2-klein-9b, flux1-schnell, dev
+- **Supported Models:**
+  - Generation/fix:
+    - `z-image-turbo`
+    - `flux2-klein-4b`
+    - `flux2-klein-9b`
+    - `flux1-schnell`
+    - `dev`
+  - Review:
+    - `qwen3-vl:8b`
+  - Upscale:
+    - `seedvr2-3b`
 - **Quality Evaluation:** sharp.js (sharpness variance, highlight/shadow clipping)
 
 ## Pipeline flow
@@ -37,23 +47,30 @@ Sharp Quality Evaluation & Metadata JSON Output
 
 ```text
 ├── output
-└── server
-    ├── server.py
-└── src
-    ├── generation
-    │   ├── mflux.ts
-    │   ├── queue.ts
-    │   ├── save.ts
-    │   └── seed.ts
-    ├── main.ts
-    ├── prompt
-    │   ├── background.ts
-    │   ├── composition.ts
-    │   ├── lighting.ts
-    │   ├── person.ts
-    │   └── photography.ts
-    └── quality
-        └── evaluate.ts
+├── server
+│   └── server.py
+├── src
+│   ├── cmd
+│   │   ├── fix.ts
+│   │   ├── gen.ts
+│   │   ├── review.ts
+│   │   └── upscale.ts
+│   ├── data
+│   │   └── people.ts
+│   ├── generation
+│   │   ├── batch.ts
+│   │   ├── evaluate.ts
+│   │   ├── metadata.ts
+│   │   └── mflux.ts
+│   ├── lib
+│   │   └── utils.ts
+│   ├── prompts
+│   │   ├── background.ts
+│   │   ├── composition.ts
+│   │   ├── evaluation.ts
+│   │   ├── lighting.ts
+│   │   ├── person.ts
+│   │   └── photography.ts
 ```
 
 ## Get started
@@ -71,25 +88,24 @@ uv tool install huggingface_hub
 
 ### Pre-download models
 
-#### For generation
+- #### For generation/fix
 
-```sh
-hf download mlx-community/Z-Image-Turbo-bf16
-hf download mlx-community/FLUX.2-klein-4B-bf16
+  ```sh
+  hf download mlx-community/Z-Image-Turbo-bf16
+  hf download mlx-community/FLUX.2-klein-4B-bf16
+  ```
 
-```
+- #### For review
 
-#### For review
+  ```sh
+  ollama pull qwen3-vl:8b
+  ```
 
-```sh
-ollama pull qwen3-vl:8b
-```
+- #### For upscale
 
-#### For upscale
-
-```sh
-hf download mlx-community/SeedVR2-3B-mlx-int8
-```
+  ```sh
+  hf download mlx-community/SeedVR2-3B-mlx-int8
+  ```
 
 ### Run
 
