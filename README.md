@@ -127,8 +127,8 @@ uv tool install huggingface_hub
 ### Run
 
 ```sh
-just gen
+just gen z-image-turbo
 just review
-just fix
+just fix z-image-turbo
 just upscale
 ```
