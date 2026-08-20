@@ -12,7 +12,7 @@ export async function loadPersonMetadata(outputDir: string, personId: string): P
     const raw = await fs.readFile(metadataPath(outputDir, personId), "utf-8");
     return JSON.parse(raw) as PersonMetadata;
   } catch {
-    return { personId, candidates: [] };
+    return { personId, prompt: "", candidates: [] };
   }
 }
 
@@ -22,8 +22,15 @@ export async function savePersonMetadata(outputDir: string, metadata: PersonMeta
   await fs.writeFile(metadataPath(outputDir, metadata.personId), JSON.stringify(metadata, null, 2));
 }
 
-export async function upsertCandidate(outputDir: string, personId: string, candidate: CandidateRecord): Promise<void> {
+export async function upsertCandidate(
+  outputDir: string,
+  personId: string,
+  prompt: string,
+  candidate: CandidateRecord,
+): Promise<void> {
   const metadata = await loadPersonMetadata(outputDir, personId);
+  metadata.prompt = prompt;
+
   const idx = metadata.candidates.findIndex((c) => c.seed === candidate.seed);
 
   if (idx >= 0) {

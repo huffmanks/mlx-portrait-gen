@@ -14,7 +14,7 @@ import type { CandidateBatchMap, MfluxModel, PersonRecord } from "#/types";
 export async function generateAllCandidates(
   database: Array<PersonRecord>,
   candidatesPerPerson = 3,
-  selectedModel: MfluxModel = "flux2-klein-4b",
+  selectedModel: MfluxModel,
   isRetry = false,
 ) {
   const outputDir = path.resolve("./output");
@@ -49,7 +49,7 @@ export async function generateAllCandidates(
 
       const personFolder = path.join(outputDir, person.id);
       await fs.mkdir(personFolder, { recursive: true });
-      candidatesMap[person.id] = [];
+      candidatesMap[person.id] = { prompt: fullPrompt, candidates: [] };
 
       let startAttempt = 0;
       if (isRetry) {
@@ -77,19 +77,14 @@ export async function generateAllCandidates(
           });
         }
 
-        await upsertCandidate(outputDir, person.id, {
+        const record = {
           seed: candidateSeed,
           model: selectedModel,
-          prompt: fullPrompt,
           candidatePath,
-        });
+        };
 
-        candidatesMap[person.id].push({
-          seed: candidateSeed,
-          model: selectedModel,
-          prompt: fullPrompt,
-          candidatePath,
-        });
+        await upsertCandidate(outputDir, person.id, fullPrompt, record);
+        candidatesMap[person.id].candidates.push(record);
       }
     }
 

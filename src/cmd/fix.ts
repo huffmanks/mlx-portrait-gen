@@ -1,3 +1,4 @@
+import { parseArgs } from "node:util";
 import path from "path";
 
 import { people } from "#/data/people";
@@ -5,11 +6,20 @@ import { generateAllCandidates } from "#/generation/batch";
 import { loadPersonMetadata } from "#/generation/metadata";
 import type { MfluxModel, PersonRecord } from "#/types";
 
+const { values } = parseArgs({
+  options: {
+    model: {
+      type: "string",
+      default: "flux2-klein",
+    },
+  },
+  allowPositionals: true,
+});
+
+const SELECTED_MODEL = values.model as MfluxModel;
 const SCORE_THRESHOLD = 80;
 
 async function main() {
-  const SELECTED_MODEL_NAME: MfluxModel = "flux2-klein-4b";
-
   const outputDir = path.resolve("./output");
   const needsFixing: Array<PersonRecord> = [];
 
@@ -44,7 +54,7 @@ async function main() {
   }
 
   console.log(`\nRegenerating replacement candidates for ${needsFixing.length} people...`);
-  await generateAllCandidates(needsFixing, 3, SELECTED_MODEL_NAME, true);
+  await generateAllCandidates(needsFixing, 3, SELECTED_MODEL, true);
   console.log("Repair generation complete. Run 'just review' to re-evaluate.");
 }
 

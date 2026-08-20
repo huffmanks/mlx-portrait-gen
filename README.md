@@ -10,15 +10,17 @@ Build and operate a local, automated AI headshot generation pipeline using struc
 - **Inference Framework:** MFLUX / Apple MLX (4-bit quantization to fit inside 16 GB RAM)
 - **Supported Models:**
   - Generation/fix:
-    - `z-image-turbo-4b`
+    - `z-image-turbo`
     - `flux2-klein-4b`
-    - `flux1-schnell-4b`
-    - `flux1-dev-4b`
+    - `flux1-schnell`
+    - `flux1-dev`
   - Review:
     - `qwen3-vl:8b`
   - Upscale:
     - `seedvr2-3b`
 - **Quality Evaluation:** sharp.js (sharpness variance, highlight/shadow clipping)
+
+## Pipeline flow
 
 ## Pipeline flow
 
@@ -31,7 +33,23 @@ HTTP POST (http://127.0.0.1:8000/generate)
     ↓
 Python MFLUX Daemon (Apple MLX / Metal GPU)
     ↓
-Sharp Quality Evaluation & Metadata JSON Output
+Candidate PNGs + per-person metadata.json (prompt, seed, model)
+    ↓
+AI Quality Review (Ollama / qwen3-vl:8b vision model)
+    ↓
+Scored candidates + issues written back to metadata.json
+    ↓
+Threshold check (top score < 80?)
+    ├─ Yes → Regenerate with fresh seeds (fix.ts) → back to AI Quality Review
+    └─ No  → Proceed
+    ↓
+Best candidate selected per person (finalCandidateSeed)
+    ↓
+HTTP POST (http://127.0.0.1:8000/upscale)
+    ↓
+Python MFLUX Daemon — SeedVR2 upscale model
+    ↓
+Final upscaled portrait (finalUpscaledPath in metadata.json)
 ```
 
 ## Core mechanics
@@ -90,10 +108,8 @@ uv tool install huggingface_hub
 - #### For generation/fix
 
   ```sh
-  hf download andrevp/Z-Image-Turbo-MLX-4bit
+  hf download filipstrand/Z-Image-Turbo-mflux-4bit
   hf download mlx-community/flux2-klein-4b-8bit
-  hf download AITRADER/FLUX1-schnell-mlx-4bit
-  hf download AITRADER/FLUX1-dev-mlx-4bit
   ```
 
 - #### For review

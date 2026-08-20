@@ -3,7 +3,16 @@ import path from "path";
 
 import { upsertCandidate } from "#/generation/metadata";
 import { evaluationPrompt } from "#/prompts/evaluation";
-import type { CandidateBatchMap, CandidateRecord, MfluxModel, QualityReport } from "#/types";
+import type { CandidateBatchMap, CandidateRecord, QualityReport } from "#/types";
+
+type RawEvaluationResponse = {
+  looksAiGenerated: boolean;
+  overallScore: number;
+  photorealismScore: number;
+  anatomicalCorrectness: number;
+  promptAdherenceScore: number;
+  issuesFound: string[];
+};
 
 async function evaluateQuality(imagePath: string, expectedPrompt: string): Promise<QualityReport> {
   const imageBuffer = await fs.readFile(imagePath);
@@ -54,54 +63,76 @@ async function evaluateQuality(imagePath: string, expectedPrompt: string): Promi
       throw new Error("No JSON object found in Ollama response.");
     }
 
-    return JSON.parse(jsonMatch[0]) as QualityReport;
-  } catch (error) {
-    console.warn("AI Evaluation fallback to 70 due to connection error:", error);
+    const raw = JSON.parse(jsonMatch[0]) as RawEvaluationResponse;
+
+    // Lower = stricter | Max = 79 any higher and will play no effect because of the 80 or higher threshold
+    const CEILING = 70;
+    const originalScore = raw.overallScore;
+    let overallScore = raw.overallScore;
+    let photorealismScore = raw.photorealismScore;
+
+    if (raw.looksAiGenerated) {
+      if (overallScore > CEILING) {
+        overallScore = Math.round((overallScore / 100) * CEILING);
+      }
+      if (photorealismScore > CEILING) {
+        photorealismScore = Math.round((photorealismScore / 100) * CEILING);
+      }
+    }
+
     return {
-      overallScore: 70,
-      photorealismScore: 70,
-      anatomicalCorrectness: 70,
-      promptAdherenceScore: 70,
-      issuesFound: ["Evaluator offline or error occurred"],
+      looksAiGenerated: raw.looksAiGenerated,
+      scores: {
+        overallScore,
+        originalScore,
+        photorealismScore,
+        anatomicalCorrectness: raw.anatomicalCorrectness,
+        promptAdherenceScore: raw.promptAdherenceScore,
+      },
+      issues: raw.issuesFound,
+    };
+  } catch (error) {
+    console.warn("AI Evaluation fallback to 0 due to connection error:", error);
+    return {
+      looksAiGenerated: false,
+      scores: {
+        originalScore: 0,
+        overallScore: 0,
+        photorealismScore: 0,
+        anatomicalCorrectness: 0,
+        promptAdherenceScore: 0,
+      },
+      issues: ["Evaluator offline or error occurred"],
     };
   }
 }
 
-export async function evaluateAllCandidates(
-  candidatesMap: CandidateBatchMap,
-  selectedModel: MfluxModel = "flux2-klein-4b",
-) {
+export async function evaluateAllCandidates(candidatesMap: CandidateBatchMap) {
   const evaluationResults: CandidateBatchMap = {};
   const outputDir = path.resolve("./output");
 
   for (const personId of Object.keys(candidatesMap)) {
-    const candidates = candidatesMap[personId];
-    evaluationResults[personId] = [];
+    const { prompt, candidates } = candidatesMap[personId];
+    evaluationResults[personId] = { prompt, candidates: [] };
 
     for (const candidate of candidates) {
       console.log(`Evaluating [${personId}] image: ${path.basename(candidate.candidatePath)}...`);
 
-      const evalReport = await evaluateQuality(candidate.candidatePath, candidate.prompt);
+      const evalReport = await evaluateQuality(candidate.candidatePath, prompt);
 
-      console.log(`Score: ${evalReport.overallScore}/100`);
-      if (evalReport.issuesFound.length > 0) {
-        console.log(`\tIssues: ${evalReport.issuesFound.join(", ")}`);
+      console.log(`Score: ${evalReport.scores.overallScore}/100`);
+      if (evalReport.issues.length > 0) {
+        console.log(`\tIssues: ${evalReport.issues.join(", ")}`);
       }
-
       const updated: CandidateRecord = {
         ...candidate,
-        model: selectedModel,
-        scores: {
-          overallScore: evalReport.overallScore,
-          photorealismScore: evalReport.photorealismScore,
-          anatomicalCorrectness: evalReport.anatomicalCorrectness,
-          promptAdherenceScore: evalReport.promptAdherenceScore,
-        },
-        issues: evalReport.issuesFound,
+        looksAiGenerated: evalReport.looksAiGenerated,
+        scores: evalReport.scores,
+        issues: evalReport.issues,
       };
 
-      await upsertCandidate(outputDir, personId, updated);
-      evaluationResults[personId].push(updated);
+      await upsertCandidate(outputDir, personId, prompt, updated);
+      evaluationResults[personId].candidates.push(updated);
     }
   }
 

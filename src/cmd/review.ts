@@ -1,13 +1,24 @@
 import fs from "fs/promises";
+import { parseArgs } from "node:util";
 import path from "path";
 
 import { evaluateAllCandidates } from "#/generation/evaluate";
-import { loadPersonMetadata } from "#/generation/metadata";
+import { loadPersonMetadata, savePersonMetadata } from "#/generation/metadata";
 import type { CandidateBatchMap, MfluxModel } from "#/types";
 
-async function main() {
-  const SELECTED_MODEL_NAME: MfluxModel = "flux2-klein-4b";
+const { values } = parseArgs({
+  options: {
+    model: {
+      type: "string",
+      default: "flux2-klein",
+    },
+  },
+  allowPositionals: true,
+});
 
+const SELECTED_MODEL = values.model as MfluxModel;
+
+async function main() {
   const outputDir = path.resolve("./output");
   const candidatesMap: CandidateBatchMap = {};
 
@@ -24,7 +35,7 @@ async function main() {
       continue;
     }
 
-    candidatesMap[personId] = metadata.candidates;
+    candidatesMap[personId] = { prompt: metadata.prompt, candidates: metadata.candidates };
   }
 
   const folderCount = Object.keys(candidatesMap).length;
@@ -34,15 +45,28 @@ async function main() {
   }
 
   console.log(`Reviewing candidates across ${folderCount} folders...`);
-  const results = await evaluateAllCandidates(candidatesMap, SELECTED_MODEL_NAME);
+  const results = await evaluateAllCandidates(candidatesMap);
 
   console.log("\nEvaluation Summary:");
   for (const personId of Object.keys(results)) {
-    const evals = results[personId].sort((a, b) => (b.scores?.overallScore ?? 0) - (a.scores?.overallScore ?? 0));
+    const evals = results[personId].candidates.sort(
+      (a, b) => (b.scores?.overallScore ?? 0) - (a.scores?.overallScore ?? 0),
+    );
     const best = evals[0];
-    if (best) {
-      console.log(`[${personId}] Top Score: ${best.scores?.overallScore}/100 (${path.basename(best.candidatePath)})`);
+    if (!best) continue;
+
+    console.log(`[${personId}] Top Score: ${best.scores?.overallScore}/100 (${path.basename(best.candidatePath)})`);
+
+    const metadata = await loadPersonMetadata(outputDir, personId);
+    const winnerChanged = metadata.finalCandidateSeed !== best.seed;
+
+    metadata.finalCandidateSeed = best.seed;
+
+    if (winnerChanged) {
+      metadata.finalUpscaledPath = undefined;
     }
+
+    await savePersonMetadata(outputDir, metadata);
   }
 }
 

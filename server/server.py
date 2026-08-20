@@ -1,5 +1,5 @@
-import gc
 import os
+import gc
 import threading
 from enum import Enum
 from contextlib import asynccontextmanager
@@ -59,11 +59,14 @@ def load_or_get_model(model_name: str, quantize: int = 4):
 
     if model_name == "z-image-turbo":
         active_model = ZImageTurbo(
+            # model_config=ModelConfig.z_image_turbo(),
+            # quantize=4,
+            # OR
             model_config=ModelConfig.z_image_turbo(),
-            model_path="andrevp/Z-Image-Turbo-MLX-4bit",
+            model_path="filipstrand/Z-Image-Turbo-mflux-4bit",
             quantize=None
         )
-    elif model_name in ["flux2", "flux2-klein-4b"]:
+    elif model_name in ["flux2", "flux2-klein", "flux2-klein-4b"]:
         active_model = Flux2Klein(
             model_config=ModelConfig.flux2_klein_4b(),
             model_path="mlx-community/flux2-klein-4b-8bit",
@@ -72,14 +75,12 @@ def load_or_get_model(model_name: str, quantize: int = 4):
     elif model_name in ["flux1-schnell", "schnell"]:
         active_model = Flux1.from_name(
             model_name="schnell",
-            model_path="AITRADER/FLUX1-schnell-mlx-4bit",
-            quantize=None
+            quantize=4
         )
-    elif model_name == "dev":
+    elif model_name in ["flux1-dev", "dev"]:
         active_model = Flux1.from_name(
             model_name="dev",
-            model_path="AITRADER/FLUX1-dev-mlx-4bit",
-            quantize=None
+            quantize=4
         )
     else:
         raise ValueError(f"Unsupported model variant: {model_name}")
@@ -107,11 +108,9 @@ def load_or_get_upscale_model():
 
 class MfluxModel(str, Enum):
     Z_IMAGE_TURBO = "z-image-turbo"
-    FLUX2 = "flux2"
-    FLUX2_KLEIN_4B = "flux2-klein-4b"
-    FLUX2_KLEIN_9B = "flux2-klein-9b"
+    FLUX2_KLEIN = "flux2-klein"
     FLUX1_SCHNELL = "flux1-schnell"
-    DEV = "dev"
+    FLUX1_DEV = "flux1-dev"
 
 class GenerateRequest(BaseModel):
     model: MfluxModel
@@ -138,9 +137,9 @@ def generate(req: GenerateRequest):
             if steps is None:
                 if req.model == "z-image-turbo":
                     steps = 9
-                elif req.model in ["flux2", "flux2-klein-4b", "flux1-schnell", "schnell"]:
+                elif req.model in ["flux2", "flux2-klein", "flux1-schnell", "schnell"]:
                     steps = 4
-                elif req.model == "dev":
+                elif req.model in ["flux1-dev", "dev"]:
                     steps = 25
                 else:
                     steps = 4
