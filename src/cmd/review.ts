@@ -1,22 +1,9 @@
 import fs from "fs/promises";
-import { parseArgs } from "node:util";
 import path from "path";
 
 import { evaluateAllCandidates } from "#/generation/evaluate";
 import { loadPersonMetadata, savePersonMetadata } from "#/generation/metadata";
-import type { CandidateBatchMap, MfluxModel } from "#/types";
-
-const { values } = parseArgs({
-  options: {
-    model: {
-      type: "string",
-      default: "flux2-klein",
-    },
-  },
-  allowPositionals: true,
-});
-
-const SELECTED_MODEL = values.model as MfluxModel;
+import type { CandidateBatchMap } from "#/types";
 
 async function main() {
   const outputDir = path.resolve("./output");

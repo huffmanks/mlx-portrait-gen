@@ -2,7 +2,7 @@ import type { PersonRecord } from "#/types";
 
 export const people: Array<PersonRecord> = [
   {
-    id: "p_001_z-image-turbo",
+    id: "p_001",
     birthdate: "05/14/1992",
     gender: "woman",
     race: "East Asian",
@@ -13,7 +13,7 @@ export const people: Array<PersonRecord> = [
     weight: 128,
   },
   {
-    id: "p_002_z-image-turbo",
+    id: "p_002",
     birthdate: "11/20/1981",
     gender: "man",
     race: "Caucasian",
