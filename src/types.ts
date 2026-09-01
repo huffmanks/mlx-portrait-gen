@@ -1,6 +1,9 @@
 export type MfluxModel =
   | "z-image-turbo" // Fast, lightweight, (9 steps, 0.0 guidance)
   | "flux2-klein" // FLUX.2 Klein (4-8 steps, low RAM)
+  | "flux2-klein-9b"
+  | "flux2-klein-base-9b"
+  | "flux2-klein" // FLUX.2 Klein (4-8 steps, low RAM)
   | "flux1-schnell" // FLUX.1 Schnell (4 steps)
   | "flux1-dev"; // FLUX.1 Dev (20–28 steps, highest quality, slower)
 

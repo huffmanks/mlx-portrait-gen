@@ -19,8 +19,10 @@ async function evaluateQuality(imagePath: string, expectedPrompt: string): Promi
   const base64Image = imageBuffer.toString("base64");
   const prompt = evaluationPrompt(expectedPrompt);
 
+  const baseUrl = process.env?.EVAL_BASE_URL ?? "http://127.0.0.1:11434";
+
   try {
-    const response = await fetch("http://127.0.0.1:11434/api/chat", {
+    const response = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

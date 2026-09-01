@@ -72,6 +72,16 @@ def load_or_get_model(model_name: str, quantize: int = 4):
             model_path="mlx-community/flux2-klein-4b-8bit",
             quantize=None
         )
+    elif model_name in ["flux2-klein-9b", "flux2-9b"]:
+        active_model = Flux2Klein(
+            model_config=ModelConfig.flux2_klein_9b(),
+            quantize=None
+        )
+    elif model_name in ["flux2-klein-base-9b"]:
+        active_model = Flux2Klein(
+            model_config=ModelConfig.flux2_klein_base_9b(),
+            quantize=None
+        )
     elif model_name in ["flux1-schnell", "schnell"]:
         active_model = Flux1.from_name(
             model_name="schnell",
@@ -109,6 +119,8 @@ def load_or_get_upscale_model():
 class MfluxModel(str, Enum):
     Z_IMAGE_TURBO = "z-image-turbo"
     FLUX2_KLEIN = "flux2-klein"
+    FLUX2_KLEIN_9B = "flux2-klein-9b"
+    FLUX2_KLEIN_BASE_9B = "flux2-klein-base-9b"
     FLUX1_SCHNELL = "flux1-schnell"
     FLUX1_DEV = "flux1-dev"
 
@@ -137,9 +149,9 @@ def generate(req: GenerateRequest):
             if steps is None:
                 if req.model == "z-image-turbo":
                     steps = 9
-                elif req.model in ["flux2", "flux2-klein", "flux1-schnell", "schnell"]:
+                elif req.model in ["flux2", "flux2-klein","flux2-klein-9b", "flux2-9b", "flux1-schnell", "schnell"]:
                     steps = 4
-                elif req.model in ["flux1-dev", "dev"]:
+                elif req.model in ["flux1-dev", "dev", "flux2-klein-base-9b"]:
                     steps = 25
                 else:
                     steps = 4
