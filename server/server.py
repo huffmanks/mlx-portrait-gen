@@ -75,6 +75,7 @@ def load_or_get_model(model_name: str, quantize: int = 4):
     elif model_name in ["flux2-klein-9b", "flux2-9b"]:
         active_model = Flux2Klein(
             model_config=ModelConfig.flux2_klein_9b(),
+            model_path="mlx-community/flux2-klein-9b-8bit",
             quantize=None
         )
     elif model_name in ["flux2-klein-base-9b"]:
