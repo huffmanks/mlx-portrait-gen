@@ -18,7 +18,7 @@ Build and operate a local, automated AI headshot generation pipeline using struc
     - `qwen3-vl:8b`
   - Upscale:
     - `seedvr2-3b`
-- **Quality Evaluation:** sharp.js (sharpness variance, highlight/shadow clipping)
+- **Quality Evaluation:**
 
 ## Pipeline flow
 
